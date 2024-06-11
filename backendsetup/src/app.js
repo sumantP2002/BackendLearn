@@ -22,3 +22,12 @@ app.use(cookieParser());
 
 // sometime i want to store private file or folder on our local system so create public folder
 app.use(express.static("public")); 
+
+
+//routes import
+import userRouter from './routes/user.routes.js'
+//routes declaration -> as we have placed route outside so get will not work we have to use 'use' middleware
+app.use("api/v1/users", userRouter);
+
+
+export { app } 
