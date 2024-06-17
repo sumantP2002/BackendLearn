@@ -5,6 +5,25 @@ import { uploadOnCloudinary } from "../utils/cloudnary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import mongoose from "mongoose";
 
+const generateAccessAndRefreshTokens = async (userId) => {
+    try{
+        const user = await User.findById(userId);
+        const accessToken = user.generateAccessToken()
+        const refreshToken = user.generateRefreshToken()
+
+
+        //need to save refresh token so that no need to ask user again and again for password
+        user.refreshToken = refreshToken
+        //this statement tell that do not validate before save -> mujhe pata hai main kya kar raha hu
+        //otherwise it require all the feild tha tis marked required in model
+        await user.save({validateBeforeSave: false})
+
+        return {accessToken, refreshToken};
+    } catch(error){
+        throw new ApiError(500, "Something went wrong while generating Refresh and Access token");
+    }
+}
+
 const registerUser = asyncHandler(async (req, res) => {
     //it is a challenge so first steps
     //1. get user fill details from frontend
@@ -102,10 +121,91 @@ const loginUser = asyncHandler( async (req, res) => {
     //send cookies
     //all done
 
-    
+    //get data
+    const {email, username, password} = req.body
+
+    //check for empty
+    if(!username && !email){
+        throw new ApiError(400, "Username or Password is Required");
+    }
+
+    //find user
+    const user = await User.findOne({
+        $or: [{username}, {email}]
+    })
+
+    //check if user exist
+    if(!user){
+        throw new ApiError(404, "No User Found")
+    }
+
+    //password validation 
+    const isPasswordValid = await user.isPasswordCorrect(password)
+
+    if(!isPasswordValid){
+        throw new ApiError(404, "Password incorrect");
+    }
+
+    //generate tokens
+    const {accessToken, refreshToken} = await generateAccessAndRefreshTokens(user._id);
+
+    //now one problem : the user ref we have have empty refresh token because we have updated user after taking a refrence
+    const loggedInUser = await User.findById(user._id).
+    select("-password -refreshToken")
+
+    //send cookies
+    const options = {
+        httpOnly: true,
+        secure: true
+    }
+
+    return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("RefreshToken", refreshToken, options)
+    .json(
+        new ApiResponse(
+            200,
+            {
+                user: loggedInUser, accessToken, refreshToken
+            },
+            "User Logged in Successfully"
+        )
+    )
+
+})
+
+const logoutUser = asyncHandler( async(req, res) => {
+    //steps
+    //1. remove all cookies
+    //2. reset all access token and refresh token
+
+    //problem1 :  how to get the refrence of user here in this
+    //solution :  using middleware that is authjwt
+    await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set: {
+                refreshToken: undefined,
+                accessToken: undefined
+            }
+        }
+    )
+
+    const options = {
+        httpOnly: true,
+        secure: true
+    }
+
+    return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "User Logged Out"))
 })
 
 export {
     registerUser,
     loginUser,
+    logoutUser
 }
