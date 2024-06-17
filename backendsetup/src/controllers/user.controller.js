@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import {User} from "../models/user.model.js"
 import { uploadOnCloudinary } from "../utils/cloudnary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import mongoose from "mongoose";
 
 const registerUser = asyncHandler(async (req, res) => {
     //it is a challenge so first steps
@@ -17,7 +18,6 @@ const registerUser = asyncHandler(async (req, res) => {
     //9. return res
 
     const {fullName, email, username, password} = req.body;
-    console.log("email : ", email)
 
     //2. validation
     //1st way
@@ -29,7 +29,7 @@ const registerUser = asyncHandler(async (req, res) => {
     if([fullName, email, username, password].some((feild) => 
         feild?.trim() === "")
     ){
-        throw ApiError(400, "All feilds are Required")
+        throw new ApiError(400, "All feilds are Required")
     }
     
 
@@ -38,8 +38,11 @@ const registerUser = asyncHandler(async (req, res) => {
         $or: [{ username },{ email }]
     })
     if(existedUser){
-        throw ApiError(409, "User Already Exist");
+        console.log("have error")
+        throw new ApiError(409, "User Already Exist");
     }
+
+
 
     //4. check for img, check for avatar
     //multer give access to req.files
@@ -49,7 +52,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
     if(req.files && Array.isArray(req.files.coverImage) 
     && req.files.coverImage.length > 0){
-        coverImageLocalPath = req.files.coverImage[0].path;
+        coverImageLocalPath = req.files.coverImage[0].path
     }
 
     if(!avatarLocalPath){
@@ -57,12 +60,11 @@ const registerUser = asyncHandler(async (req, res) => {
     }
 
     //cloudinary upload
-
-    const avatar = await uploadOnCloudinary(avatarLocalPath);
-    const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+    const avatar = await uploadOnCloudinary(avatarLocalPath)
+    const coverImage = await uploadOnCloudinary(coverImageLocalPath)
 
     if(!avatar){
-        throw ApiError(400, "Avatar file not uploaded");
+        throw new ApiError(400, "Avatar file not uploaded");
     }
    
     //create object and save to db
@@ -82,7 +84,7 @@ const registerUser = asyncHandler(async (req, res) => {
     );
 
     if(!createdUser){
-        throw ApiError(500, "Something went wrong while registering the user");
+        throw new ApiError(500, "Something went wrong while registering the user");
     }
 
     return res.status(201).json(
@@ -90,5 +92,20 @@ const registerUser = asyncHandler(async (req, res) => {
     )
 })
 
+const loginUser = asyncHandler( async (req, res) => {
+    //get the input(username, password) -> from req body
+    // username or email hai ya nahi 
+    //password hai ya nahi
+    //find user -> if no return
+    //password check -> if wrong no entry
+    //generate access and refresh token 
+    //send cookies
+    //all done
 
-export {registerUser}
+    
+})
+
+export {
+    registerUser,
+    loginUser,
+}
